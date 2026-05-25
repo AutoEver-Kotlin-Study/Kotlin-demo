@@ -41,6 +41,7 @@ class UserLocationServiceTest {
 
         assertEquals(
             UserLocation(
+                groupId = groupId,
                 userId = userId,
                 location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
                 updatedAt = fixedInstant,
@@ -74,18 +75,17 @@ class UserLocationServiceTest {
         val group = group(groupId, ownerId = requesterId)
         group.addParticipant(visibleUserId)
         val locationPort = RecordingUserLocationPort()
-        locationPort.save(location(visibleUserId))
-        locationPort.save(location(leftUserId))
+        locationPort.save(location(groupId, visibleUserId))
+        locationPort.save(location(groupId, leftUserId))
         val service = service(groups = mapOf(groupId to group), userLocationPort = locationPort)
 
         val result = service.get(
             GetGroupUserLocationsCommand(
-                requesterId = requesterId,
                 groupId = groupId,
             ),
         )
 
-        assertEquals(listOf(location(visibleUserId)), result)
+        assertEquals(listOf(location(groupId, visibleUserId)), result)
     }
 
     private fun service(
@@ -111,11 +111,15 @@ class UserLocationServiceTest {
             locations[location.userId] = location
         }
 
-        override fun loadByUserIds(userIds: Set<UserId>): List<UserLocation> =
-            userIds.mapNotNull(locations::get)
+        override fun loadByGroupId(groupId: GroupId): List<UserLocation> =
+            locations.values.filter { it.groupId == groupId }
 
-        override fun deleteByUserId(userId: UserId) {
+        override fun deleteByGroupIdAndUserId(groupId: GroupId, userId: UserId) {
             locations.remove(userId)
+        }
+
+        override fun deleteByGroupId(groupId: GroupId) {
+            locations.entries.removeIf { it.value.groupId == groupId }
         }
     }
 
@@ -130,8 +134,9 @@ class UserLocationServiceTest {
             maxParticipantCount = 5,
         )
 
-    private fun location(userId: UserId): UserLocation =
+    private fun location(groupId: GroupId, userId: UserId): UserLocation =
         UserLocation(
+            groupId = groupId,
             userId = userId,
             location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
             updatedAt = fixedInstant,

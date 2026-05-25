@@ -160,5 +160,21 @@ class MapGroup private constructor(
             participantIds = linkedSetOf(ownerId),
             deleted = false,
         )
+
+        fun restore(
+            id: GroupId,
+            ownerId: UserId,
+            name: GroupName,
+            maxParticipantCount: Int,
+            participantIds: Set<UserId>,
+            deleted: Boolean,
+        ): MapGroup = MapGroup(
+            id = id,
+            ownerId = ownerId,
+            name = name,
+            maxParticipantCount = maxParticipantCount,
+            participantIds = LinkedHashSet(participantIds),
+            deleted = deleted,
+        )
     }
 }

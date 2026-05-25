@@ -1,11 +1,11 @@
 package com.example.haeautoeverstudy
 
 import org.junit.jupiter.api.Test
-import kotlin.test.assertNotNull
+import org.springframework.boot.test.context.SpringBootTest
 
+@SpringBootTest
 class HaeAutoeverStudyApplicationTests {
     @Test
-    fun `application class exists`() {
-        assertNotNull(HaeAutoeverStudyApplication::class)
+    fun contextLoads() {
     }
 }

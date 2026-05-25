@@ -30,11 +30,17 @@ class GroupDeletionForbiddenException(groupId: String, userId: String) :
 class GroupAlreadyDeletedException(groupId: String) :
     DomainModelException("Group[$groupId] is already deleted")
 
+class GroupAlreadyExistsException(groupId: String) :
+    DomainModelException("Group[$groupId] already exists")
+
 class InvalidUserNameException :
     DomainModelException("User name cannot be blank")
 
 class InvalidPhoneNumberException(phoneNumber: String) :
     DomainModelException("Phone number[$phoneNumber] is invalid")
+
+class UserAlreadyExistsException(phoneNumber: String) :
+    DomainModelException("User with phone number[$phoneNumber] already exists")
 
 class UserAlreadyJoinedGroupException(userId: String, groupId: String) :
     DomainModelException("User[$userId] already joined Group[$groupId]")

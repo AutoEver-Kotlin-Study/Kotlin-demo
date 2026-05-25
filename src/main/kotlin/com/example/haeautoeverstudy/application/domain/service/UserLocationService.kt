@@ -8,6 +8,7 @@ import com.example.haeautoeverstudy.application.port.`in`.UpdateUserLocationUseC
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 
@@ -18,12 +19,14 @@ class UserLocationService(
     private val clock: Clock = Clock.systemUTC(),
 ) : UpdateUserLocationUseCase, GetGroupUserLocationsUseCase {
 
+    @Transactional(readOnly = true)
     override fun update(command: UpdateUserLocationCommand) {
         val group = loadMapGroupPort.loadById(command.groupId)
         group.assertParticipant(command.userId)
 
         userLocationPort.save(
             UserLocation(
+                groupId = command.groupId,
                 userId = command.userId,
                 location = command.location,
                 updatedAt = Instant.now(clock),
@@ -31,11 +34,12 @@ class UserLocationService(
         )
     }
 
+    @Transactional(readOnly = true)
     override fun get(command: GetGroupUserLocationsCommand): List<UserLocation> {
         val group = loadMapGroupPort.loadById(command.groupId)
-        val visibleUserIds = group.visibleParticipantIdsFor(command.requesterId)
+        val participantIds = group.participants
 
-        return userLocationPort.loadByUserIds(visibleUserIds)
-            .filter { it.userId in visibleUserIds }
+        return userLocationPort.loadByGroupId(command.groupId)
+            .filter { it.userId in participantIds }
     }
 }

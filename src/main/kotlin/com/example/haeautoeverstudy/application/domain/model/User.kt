@@ -89,5 +89,17 @@ class User private constructor(
             name = name,
             phoneNumber = phoneNumber,
         )
+
+        fun restore(
+            id: UserId,
+            name: UserName,
+            phoneNumber: PhoneNumber,
+            joinedGroupIds: Set<GroupId>,
+        ): User = User(
+            id = id,
+            name = name,
+            phoneNumber = phoneNumber,
+            joinedGroupIds = HashSet(joinedGroupIds),
+        )
     }
 }
