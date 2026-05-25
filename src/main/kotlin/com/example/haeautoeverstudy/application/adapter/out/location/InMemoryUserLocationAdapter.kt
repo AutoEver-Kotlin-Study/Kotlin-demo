@@ -1,6 +1,5 @@
 package com.example.haeautoeverstudy.application.adapter.out.location
 
-import com.example.haeautoeverstudy.application.domain.model.GroupId
 import com.example.haeautoeverstudy.application.domain.model.UserId
 import com.example.haeautoeverstudy.application.domain.model.UserLocation
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
@@ -9,21 +8,20 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class InMemoryUserLocationAdapter : UserLocationPort {
-    private val locationsByGroupId = ConcurrentHashMap<GroupId, ConcurrentHashMap<UserId, UserLocation>>()
+    private val locationsByUserId = ConcurrentHashMap<UserId, UserLocation>()
 
     override fun save(location: UserLocation) {
-        locationsByGroupId
-            .computeIfAbsent(location.groupId) { ConcurrentHashMap() }[location.userId] = location
+        locationsByUserId[location.userId] = location
     }
 
-    override fun loadByGroupId(groupId: GroupId): List<UserLocation> =
-        locationsByGroupId[groupId]?.values?.toList().orEmpty()
+    override fun loadByUserIds(userIds: Set<UserId>): List<UserLocation> =
+        userIds.mapNotNull(locationsByUserId::get)
 
-    override fun deleteByGroupIdAndUserId(groupId: GroupId, userId: UserId) {
-        locationsByGroupId[groupId]?.remove(userId)
+    override fun deleteByUserId(userId: UserId) {
+        locationsByUserId.remove(userId)
     }
 
-    override fun deleteByGroupId(groupId: GroupId) {
-        locationsByGroupId.remove(groupId)
+    override fun deleteByUserIds(userIds: Set<UserId>) {
+        userIds.forEach(locationsByUserId::remove)
     }
 }

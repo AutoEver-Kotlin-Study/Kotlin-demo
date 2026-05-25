@@ -84,10 +84,12 @@ class GroupManagementService(
                     .forEach { user ->
                         user.leaveGroup(group.id)
                         saveUserPort.save(user)
+                        if (user.groupIds.isEmpty()) {
+                            userLocationPort.deleteByUserId(user.id)
+                        }
                     }
 
                 saveMapGroupPort.save(group)
-                userLocationPort.deleteByGroupId(group.id)
                 publishMapGroupEventPort.publish(event)
             }
         }

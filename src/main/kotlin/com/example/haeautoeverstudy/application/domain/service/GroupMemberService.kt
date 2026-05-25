@@ -57,7 +57,9 @@ class GroupMemberService(
 
                 saveUserPort.save(user)
                 saveMapGroupPort.save(group)
-                userLocationPort.deleteByGroupIdAndUserId(group.id, user.id)
+                if (user.groupIds.isEmpty()) {
+                    userLocationPort.deleteByUserId(user.id)
+                }
                 publishMapGroupEventPort.publish(event)
             }
         }

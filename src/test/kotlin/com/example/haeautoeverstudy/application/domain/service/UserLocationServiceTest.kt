@@ -4,12 +4,15 @@ import com.example.haeautoeverstudy.application.domain.model.GeoLocation
 import com.example.haeautoeverstudy.application.domain.model.GroupId
 import com.example.haeautoeverstudy.application.domain.model.GroupName
 import com.example.haeautoeverstudy.application.domain.model.MapGroup
+import com.example.haeautoeverstudy.application.domain.model.PhoneNumber
+import com.example.haeautoeverstudy.application.domain.model.User
 import com.example.haeautoeverstudy.application.domain.model.UserId
 import com.example.haeautoeverstudy.application.domain.model.UserLocation
-import com.example.haeautoeverstudy.application.domain.model.exception.NonParticipantAccessException
+import com.example.haeautoeverstudy.application.domain.model.UserName
 import com.example.haeautoeverstudy.application.port.`in`.GetGroupUserLocationsCommand
 import com.example.haeautoeverstudy.application.port.`in`.UpdateUserLocationCommand
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
+import com.example.haeautoeverstudy.application.port.out.LoadUserPort
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
 import java.time.Clock
 import java.time.Instant
@@ -23,25 +26,24 @@ class UserLocationServiceTest {
     private val clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
 
     @Test
-    fun `updates location only when user is group participant`() {
-        val groupId = GroupId("group")
+    fun `updates latest user location without group id`() {
         val userId = UserId("participant")
-        val group = group(groupId)
-        group.addParticipant(userId)
         val locationPort = RecordingUserLocationPort()
-        val service = service(groups = mapOf(groupId to group), userLocationPort = locationPort)
+        val service = service(
+            users = mapOf(userId to user(userId)),
+            groups = emptyMap(),
+            userLocationPort = locationPort,
+        )
 
         service.update(
             UpdateUserLocationCommand(
                 userId = userId,
-                groupId = groupId,
                 location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
             ),
         )
 
         assertEquals(
             UserLocation(
-                groupId = groupId,
                 userId = userId,
                 location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
                 updatedAt = fixedInstant,
@@ -51,15 +53,13 @@ class UserLocationServiceTest {
     }
 
     @Test
-    fun `rejects location update from non participant`() {
-        val groupId = GroupId("group")
-        val service = service(groups = mapOf(groupId to group(groupId)))
+    fun `rejects location update from missing user`() {
+        val service = service(users = emptyMap(), groups = emptyMap())
 
-        assertFailsWith<NonParticipantAccessException> {
+        assertFailsWith<NoSuchElementException> {
             service.update(
                 UpdateUserLocationCommand(
-                    userId = UserId("stranger"),
-                    groupId = groupId,
+                    userId = UserId("missing"),
                     location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
                 ),
             )
@@ -75,8 +75,8 @@ class UserLocationServiceTest {
         val group = group(groupId, ownerId = requesterId)
         group.addParticipant(visibleUserId)
         val locationPort = RecordingUserLocationPort()
-        locationPort.save(location(groupId, visibleUserId))
-        locationPort.save(location(groupId, leftUserId))
+        locationPort.save(location(visibleUserId))
+        locationPort.save(location(leftUserId))
         val service = service(groups = mapOf(groupId to group), userLocationPort = locationPort)
 
         val result = service.get(
@@ -85,18 +85,25 @@ class UserLocationServiceTest {
             ),
         )
 
-        assertEquals(listOf(location(groupId, visibleUserId)), result)
+        assertEquals(listOf(location(visibleUserId)), result)
     }
 
     private fun service(
+        users: Map<UserId, User> = emptyMap(),
         groups: Map<GroupId, MapGroup>,
         userLocationPort: RecordingUserLocationPort = RecordingUserLocationPort(),
     ): UserLocationService =
         UserLocationService(
+            loadUserPort = FakeLoadUserPort(users),
             loadMapGroupPort = FakeLoadMapGroupPort(groups),
             userLocationPort = userLocationPort,
             clock = clock,
         )
+
+    private class FakeLoadUserPort(private val users: Map<UserId, User>) : LoadUserPort {
+        override fun loadById(userId: UserId): User =
+            users[userId] ?: throw NoSuchElementException("User[${userId.value}] not found")
+    }
 
     private class FakeLoadMapGroupPort(private val groups: Map<GroupId, MapGroup>) : LoadMapGroupPort {
         override fun loadById(groupId: GroupId): MapGroup = groups.getValue(groupId)
@@ -111,15 +118,15 @@ class UserLocationServiceTest {
             locations[location.userId] = location
         }
 
-        override fun loadByGroupId(groupId: GroupId): List<UserLocation> =
-            locations.values.filter { it.groupId == groupId }
+        override fun loadByUserIds(userIds: Set<UserId>): List<UserLocation> =
+            userIds.mapNotNull(locations::get)
 
-        override fun deleteByGroupIdAndUserId(groupId: GroupId, userId: UserId) {
+        override fun deleteByUserId(userId: UserId) {
             locations.remove(userId)
         }
 
-        override fun deleteByGroupId(groupId: GroupId) {
-            locations.entries.removeIf { it.value.groupId == groupId }
+        override fun deleteByUserIds(userIds: Set<UserId>) {
+            userIds.forEach(locations::remove)
         }
     }
 
@@ -134,9 +141,15 @@ class UserLocationServiceTest {
             maxParticipantCount = 5,
         )
 
-    private fun location(groupId: GroupId, userId: UserId): UserLocation =
+    private fun user(userId: UserId): User =
+        User.of(
+            id = userId,
+            name = UserName("${userId.value}User"),
+            phoneNumber = PhoneNumber("01012345678"),
+        )
+
+    private fun location(userId: UserId): UserLocation =
         UserLocation(
-            groupId = groupId,
             userId = userId,
             location = GeoLocation(latitude = 37.5665, longitude = 126.9780),
             updatedAt = fixedInstant,

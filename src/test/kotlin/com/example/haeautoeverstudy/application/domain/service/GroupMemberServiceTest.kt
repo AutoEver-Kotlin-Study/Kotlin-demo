@@ -219,14 +219,16 @@ class GroupMemberServiceTest {
 
         override fun save(location: com.example.haeautoeverstudy.application.domain.model.UserLocation) = Unit
 
-        override fun loadByGroupId(groupId: GroupId): List<com.example.haeautoeverstudy.application.domain.model.UserLocation> =
+        override fun loadByUserIds(userIds: Set<UserId>): List<com.example.haeautoeverstudy.application.domain.model.UserLocation> =
             emptyList()
 
-        override fun deleteByGroupIdAndUserId(groupId: GroupId, userId: UserId) {
+        override fun deleteByUserId(userId: UserId) {
             deletedUserIds += userId
         }
 
-        override fun deleteByGroupId(groupId: GroupId) = Unit
+        override fun deleteByUserIds(userIds: Set<UserId>) {
+            deletedUserIds += userIds
+        }
     }
 
     private class RecordingLockPort : GroupLockPort {

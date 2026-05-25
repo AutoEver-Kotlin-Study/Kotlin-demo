@@ -201,7 +201,7 @@ class GroupMembershipIntegrationTest {
         }
         assertFalse("late" in mapGroupJpaRepository.findById("group").orElseThrow().participantIds)
 
-        mockMvc.put("/api/groups/group/locations/participant") {
+        mockMvc.put("/api/users/participant/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":37.5665,"longitude":126.9780}"""
         }.andExpect {
@@ -283,27 +283,122 @@ class GroupMembershipIntegrationTest {
     }
 
     @Test
-    fun `location update rejects non participant invalid coordinate and missing group`() {
-        mockMvc.put("/api/groups/group/locations/late") {
+    fun `user location update is visible only in groups the user belongs to`() {
+        mapGroupJpaRepository.save(
+            MapGroupJpaEntity(
+                id = "another",
+                ownerId = "creator",
+                name = "travel",
+                maxParticipantCount = 3,
+                deleted = false,
+                participantIds = linkedSetOf("creator"),
+            ),
+        )
+        val creator = userJpaRepository.findById("creator").orElseThrow()
+        creator.joinedGroupIds += "another"
+        userJpaRepository.save(creator)
+
+        mockMvc.put("/api/users/participant/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":37.5665,"longitude":126.9780}"""
         }.andExpect {
-            status { isBadRequest() }
+            status { isNoContent() }
         }
 
-        mockMvc.put("/api/groups/group/locations/owner") {
+        mockMvc.get("/api/groups/group/locations")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.locations.length()") { value(0) }
+            }
+
+        mockMvc.post("/api/groups/group/members") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"userId":"participant"}"""
+        }.andExpect {
+            status { isNoContent() }
+        }
+
+        mockMvc.get("/api/groups/group/locations")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.locations.length()") { value(1) }
+                jsonPath("$.locations[0].userId") { value("participant") }
+            }
+
+        mockMvc.get("/api/groups/another/locations")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.locations.length()") { value(0) }
+            }
+    }
+
+    @Test
+    fun `location update rejects invalid coordinate and missing user`() {
+        mockMvc.put("/api/users/owner/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":91.0,"longitude":126.9780}"""
         }.andExpect {
             status { isBadRequest() }
         }
 
-        mockMvc.put("/api/groups/missing-group/locations/owner") {
+        mockMvc.put("/api/users/missing/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":37.5665,"longitude":126.9780}"""
         }.andExpect {
             status { isNotFound() }
         }
+
+        mockMvc.get("/api/groups/missing-group/locations")
+            .andExpect {
+                status { isNotFound() }
+            }
+    }
+
+    @Test
+    fun `global user location is not removed when user leaves one of several groups`() {
+        mapGroupJpaRepository.save(
+            MapGroupJpaEntity(
+                id = "another",
+                ownerId = "creator",
+                name = "travel",
+                maxParticipantCount = 3,
+                deleted = false,
+                participantIds = linkedSetOf("creator", "participant"),
+            ),
+        )
+        val participant = userJpaRepository.findById("participant").orElseThrow()
+        participant.joinedGroupIds += setOf("group", "another")
+        userJpaRepository.save(participant)
+        val group = mapGroupJpaRepository.findById("group").orElseThrow()
+        group.participantIds += "participant"
+        mapGroupJpaRepository.save(group)
+
+        mockMvc.put("/api/users/participant/location") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"latitude":37.5665,"longitude":126.9780}"""
+        }.andExpect {
+            status { isNoContent() }
+        }
+
+        mockMvc.post("/api/groups/group/members/leave") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"userId":"participant"}"""
+        }.andExpect {
+            status { isNoContent() }
+        }
+
+        mockMvc.get("/api/groups/group/locations")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.locations.length()") { value(0) }
+            }
+
+        mockMvc.get("/api/groups/another/locations")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.locations.length()") { value(1) }
+                jsonPath("$.locations[0].userId") { value("participant") }
+            }
     }
 
     @Test
@@ -315,7 +410,7 @@ class GroupMembershipIntegrationTest {
             status { isNoContent() }
         }
 
-        mockMvc.put("/api/groups/group/locations/participant") {
+        mockMvc.put("/api/users/participant/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":37.5665,"longitude":126.9780}"""
         }.andExpect {
@@ -387,6 +482,7 @@ class GroupMembershipIntegrationTest {
                 jsonPath("$.paths['/api/groups/{groupId}']") { exists() }
                 jsonPath("$.paths['/api/groups/{groupId}/members']") { exists() }
                 jsonPath("$.paths['/api/groups/{groupId}/locations']") { exists() }
+                jsonPath("$.paths['/api/users/{userId}/location']") { exists() }
                 jsonPath("$.paths['/api/users/{userId}/groups']") { exists() }
             }
     }

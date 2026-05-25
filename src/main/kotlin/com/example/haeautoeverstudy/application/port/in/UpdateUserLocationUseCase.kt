@@ -1,7 +1,6 @@
 package com.example.haeautoeverstudy.application.port.`in`
 
 import com.example.haeautoeverstudy.application.domain.model.GeoLocation
-import com.example.haeautoeverstudy.application.domain.model.GroupId
 import com.example.haeautoeverstudy.application.domain.model.UserId
 
 fun interface UpdateUserLocationUseCase {
@@ -10,6 +9,5 @@ fun interface UpdateUserLocationUseCase {
 
 data class UpdateUserLocationCommand(
     val userId: UserId,
-    val groupId: GroupId,
     val location: GeoLocation,
 )

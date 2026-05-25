@@ -6,6 +6,7 @@ import com.example.haeautoeverstudy.application.port.`in`.GetGroupUserLocationsU
 import com.example.haeautoeverstudy.application.port.`in`.UpdateUserLocationCommand
 import com.example.haeautoeverstudy.application.port.`in`.UpdateUserLocationUseCase
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
+import com.example.haeautoeverstudy.application.port.out.LoadUserPort
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,6 +15,7 @@ import java.time.Instant
 
 @Service
 class UserLocationService(
+    private val loadUserPort: LoadUserPort,
     private val loadMapGroupPort: LoadMapGroupPort,
     private val userLocationPort: UserLocationPort,
     private val clock: Clock = Clock.systemUTC(),
@@ -21,12 +23,10 @@ class UserLocationService(
 
     @Transactional(readOnly = true)
     override fun update(command: UpdateUserLocationCommand) {
-        val group = loadMapGroupPort.loadById(command.groupId)
-        group.assertParticipant(command.userId)
+        loadUserPort.loadById(command.userId)
 
         userLocationPort.save(
             UserLocation(
-                groupId = command.groupId,
                 userId = command.userId,
                 location = command.location,
                 updatedAt = Instant.now(clock),
@@ -39,7 +39,6 @@ class UserLocationService(
         val group = loadMapGroupPort.loadById(command.groupId)
         val participantIds = group.participants
 
-        return userLocationPort.loadByGroupId(command.groupId)
-            .filter { it.userId in participantIds }
+        return userLocationPort.loadByUserIds(participantIds)
     }
 }

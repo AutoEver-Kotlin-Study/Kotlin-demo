@@ -15,29 +15,25 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 @RestController
-@RequestMapping("/api/groups/{groupId}/locations")
 @Tag(name = "User Locations", description = "Realtime user location APIs")
 class UserLocationController(
     private val updateUserLocationUseCase: UpdateUserLocationUseCase,
     private val getGroupUserLocationsUseCase: GetGroupUserLocationsUseCase,
 ) {
-    @PutMapping("/{userId}")
+    @PutMapping("/api/users/{userId}/location")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Update user location", description = "Updates an in-memory location snapshot for a group participant.")
+    @Operation(summary = "Update user location", description = "Updates a user's latest in-memory location snapshot.")
     fun update(
-        @PathVariable groupId: String,
         @PathVariable userId: String,
         @RequestBody request: UpdateUserLocationRequest,
     ) {
         updateUserLocationUseCase.update(
             UpdateUserLocationCommand(
-                groupId = GroupId(groupId),
                 userId = UserId(userId),
                 location = GeoLocation(
                     latitude = request.latitude,
@@ -47,7 +43,7 @@ class UserLocationController(
         )
     }
 
-    @GetMapping
+    @GetMapping("/api/groups/{groupId}/locations")
     @Operation(summary = "Get group user locations", description = "Returns location snapshots for current group participants.")
     fun getGroupLocations(
         @PathVariable groupId: String,
