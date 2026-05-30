@@ -1,9 +1,7 @@
 package com.example.haeautoeverstudy.application.domain.model
 
-import com.example.haeautoeverstudy.application.domain.model.exception.GroupMembershipNotFoundException
 import com.example.haeautoeverstudy.application.domain.model.exception.InvalidPhoneNumberException
 import com.example.haeautoeverstudy.application.domain.model.exception.InvalidUserNameException
-import com.example.haeautoeverstudy.application.domain.model.exception.UserAlreadyJoinedGroupException
 import java.util.UUID
 
 @JvmInline
@@ -59,25 +57,7 @@ class User private constructor(
     val id: UserId,
     val name: UserName,
     val phoneNumber: PhoneNumber,
-    private val joinedGroupIds: HashSet<GroupId> = HashSet(),
 ) {
-    val groupIds: Set<GroupId>
-        get() = joinedGroupIds.toSet()
-
-    fun joinGroup(groupId: GroupId) {
-        if (!joinedGroupIds.add(groupId)) {
-            throw UserAlreadyJoinedGroupException(id.value, groupId.value)
-        }
-    }
-
-    fun leaveGroup(groupId: GroupId) {
-        if (!joinedGroupIds.remove(groupId)) {
-            throw GroupMembershipNotFoundException(id.value, groupId.value)
-        }
-    }
-
-    fun isMemberOf(groupId: GroupId): Boolean = groupId in joinedGroupIds
-
     //팩토리 메서드
     companion object {
         fun of(
@@ -94,12 +74,10 @@ class User private constructor(
             id: UserId,
             name: UserName,
             phoneNumber: PhoneNumber,
-            joinedGroupIds: Set<GroupId>,
         ): User = User(
             id = id,
             name = name,
             phoneNumber = phoneNumber,
-            joinedGroupIds = HashSet(joinedGroupIds),
         )
     }
 }

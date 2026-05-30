@@ -16,4 +16,15 @@ interface MapGroupJpaRepository : JpaRepository<MapGroupJpaEntity, String> {
 
     @Query("select distinct g from MapGroupJpaEntity g left join fetch g.participantIds where g.id in :ids")
     fun findAllWithParticipantsByIdIn(@Param("ids") ids: Collection<String>): List<MapGroupJpaEntity>
+
+    @Query(
+        """
+        select distinct g
+        from MapGroupJpaEntity g
+        left join fetch g.participantIds
+        where :userId member of g.participantIds
+          and g.deleted = false
+        """,
+    )
+    fun findAllActiveByParticipantId(@Param("userId") userId: String): List<MapGroupJpaEntity>
 }

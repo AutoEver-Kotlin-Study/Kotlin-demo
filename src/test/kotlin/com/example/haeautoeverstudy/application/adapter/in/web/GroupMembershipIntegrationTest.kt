@@ -49,7 +49,7 @@ class GroupMembershipIntegrationTest {
 
         userJpaRepository.saveAll(
             listOf(
-                userEntity(id = "owner", phoneNumber = "01010000001", joinedGroupIds = linkedSetOf("group")),
+                userEntity(id = "owner", phoneNumber = "01010000001"),
                 userEntity(id = "participant", phoneNumber = "01010000002"),
                 userEntity(id = "late", phoneNumber = "01010000003"),
                 userEntity(id = "creator", phoneNumber = "01010000004"),
@@ -82,7 +82,6 @@ class GroupMembershipIntegrationTest {
         val savedUser = userJpaRepository.findAll()
             .first { it.name == "newUser" }
         assertEquals("01098765432", savedUser.phoneNumber)
-        assertTrue(savedUser.joinedGroupIds.isEmpty())
     }
 
     @Test
@@ -135,9 +134,7 @@ class GroupMembershipIntegrationTest {
         }
 
         val createdGroup = mapGroupJpaRepository.findById("created").orElseThrow()
-        val creator = userJpaRepository.findById("creator").orElseThrow()
         assertEquals(setOf("creator"), createdGroup.participantIds)
-        assertEquals(setOf("created"), creator.joinedGroupIds)
 
         mockMvc.post("/api/groups") {
             contentType = MediaType.APPLICATION_JSON
@@ -189,9 +186,7 @@ class GroupMembershipIntegrationTest {
         }
 
         val joinedGroup = mapGroupJpaRepository.findById("group").orElseThrow()
-        val joinedUser = userJpaRepository.findById("participant").orElseThrow()
         assertEquals(setOf("owner", "participant"), joinedGroup.participantIds)
-        assertEquals(setOf("group"), joinedUser.joinedGroupIds)
 
         mockMvc.post("/api/groups/group/members") {
             contentType = MediaType.APPLICATION_JSON
@@ -226,9 +221,7 @@ class GroupMembershipIntegrationTest {
         }
 
         val leftGroup = mapGroupJpaRepository.findById("group").orElseThrow()
-        val leftUser = userJpaRepository.findById("participant").orElseThrow()
         assertEquals(setOf("owner"), leftGroup.participantIds)
-        assertTrue(leftUser.joinedGroupIds.isEmpty())
 
         mockMvc.get("/api/groups/group/locations")
             .andExpect {
@@ -275,11 +268,7 @@ class GroupMembershipIntegrationTest {
         }
 
         val group = mapGroupJpaRepository.findById("group").orElseThrow()
-        val participant = userJpaRepository.findById("participant").orElseThrow()
-        val late = userJpaRepository.findById("late").orElseThrow()
         assertEquals(setOf("owner", "participant"), group.participantIds)
-        assertEquals(setOf("group"), participant.joinedGroupIds)
-        assertTrue(late.joinedGroupIds.isEmpty())
     }
 
     @Test
@@ -294,10 +283,6 @@ class GroupMembershipIntegrationTest {
                 participantIds = linkedSetOf("creator"),
             ),
         )
-        val creator = userJpaRepository.findById("creator").orElseThrow()
-        creator.joinedGroupIds += "another"
-        userJpaRepository.save(creator)
-
         mockMvc.put("/api/users/participant/location") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"latitude":37.5665,"longitude":126.9780}"""
@@ -366,9 +351,6 @@ class GroupMembershipIntegrationTest {
                 participantIds = linkedSetOf("creator", "participant"),
             ),
         )
-        val participant = userJpaRepository.findById("participant").orElseThrow()
-        participant.joinedGroupIds += setOf("group", "another")
-        userJpaRepository.save(participant)
         val group = mapGroupJpaRepository.findById("group").orElseThrow()
         group.participantIds += "participant"
         mapGroupJpaRepository.save(group)
@@ -434,11 +416,7 @@ class GroupMembershipIntegrationTest {
         }
 
         val deletedGroup = mapGroupJpaRepository.findById("group").orElseThrow()
-        val owner = userJpaRepository.findById("owner").orElseThrow()
-        val participant = userJpaRepository.findById("participant").orElseThrow()
         assertTrue(deletedGroup.deleted)
-        assertTrue(owner.joinedGroupIds.isEmpty())
-        assertTrue(participant.joinedGroupIds.isEmpty())
 
         mockMvc.get("/api/users/participant/groups")
             .andExpect {
@@ -490,13 +468,11 @@ class GroupMembershipIntegrationTest {
     private fun userEntity(
         id: String,
         phoneNumber: String,
-        joinedGroupIds: MutableSet<String> = linkedSetOf(),
     ): UserJpaEntity =
         UserJpaEntity(
             id = id,
             name = "${id}User",
             phoneNumber = phoneNumber,
-            joinedGroupIds = joinedGroupIds,
         )
 
     @TestConfiguration

@@ -14,10 +14,10 @@ import com.example.haeautoeverstudy.application.port.`in`.JoinGroupCommand
 import com.example.haeautoeverstudy.application.port.`in`.LeaveGroupCommand
 import com.example.haeautoeverstudy.application.port.out.GroupLockPort
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
+import com.example.haeautoeverstudy.application.port.out.LoadMapGroupsPort
 import com.example.haeautoeverstudy.application.port.out.LoadUserPort
 import com.example.haeautoeverstudy.application.port.out.PublishMapGroupEventPort
 import com.example.haeautoeverstudy.application.port.out.SaveMapGroupPort
-import com.example.haeautoeverstudy.application.port.out.SaveUserPort
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
@@ -46,10 +46,8 @@ class GroupMemberServiceTest {
         fixture.service.join(JoinGroupCommand(userId = user.id, groupId = groupId))
 
         assertEquals(listOf(groupId), assertIs<RecordingLockPort>(fixture.lockPort).lockedGroupIds)
-        assertEquals(listOf(user), fixture.saveUserPort.savedUsers)
         assertEquals(listOf(group), fixture.saveMapGroupPort.savedGroups)
         assertEquals(emptyList(), fixture.userLocationPort.deletedUserIds)
-        assertTrue(user.isMemberOf(groupId))
         assertTrue(user.id in group.participants)
 
         val event = assertIs<MapGroupEvent.ParticipantJoined>(fixture.publishPort.publishedEvents.single())
@@ -63,16 +61,13 @@ class GroupMemberServiceTest {
         val user = user("participant")
         val group = group(groupId = groupId, maxParticipantCount = 2)
         group.addParticipant(user.id)
-        user.joinGroup(groupId)
         val fixture = fixture(users = mutableMapOf(user.id to user), groups = mutableMapOf(groupId to group))
 
         fixture.service.leave(LeaveGroupCommand(userId = user.id, groupId = groupId))
 
         assertEquals(listOf(groupId), assertIs<RecordingLockPort>(fixture.lockPort).lockedGroupIds)
-        assertEquals(listOf(user), fixture.saveUserPort.savedUsers)
         assertEquals(listOf(group), fixture.saveMapGroupPort.savedGroups)
         assertEquals(listOf(user.id), fixture.userLocationPort.deletedUserIds)
-        assertTrue(!user.isMemberOf(groupId))
         assertTrue(user.id !in group.participants)
 
         val event = assertIs<MapGroupEvent.ParticipantLeft>(fixture.publishPort.publishedEvents.single())
@@ -155,14 +150,14 @@ class GroupMemberServiceTest {
     ): Fixture {
         val loadUserPort = FakeLoadUserPort(users)
         val loadMapGroupPort = FakeLoadMapGroupPort(groups)
-        val saveUserPort = RecordingSaveUserPort()
+        val loadMapGroupsPort = FakeLoadMapGroupsPort(groups)
         val saveMapGroupPort = RecordingSaveMapGroupPort()
         val publishPort = RecordingPublishMapGroupEventPort()
         val userLocationPort = RecordingUserLocationPort()
         val service = GroupMemberService(
             loadUserPort = loadUserPort,
             loadMapGroupPort = loadMapGroupPort,
-            saveUserPort = saveUserPort,
+            loadMapGroupsPort = loadMapGroupsPort,
             saveMapGroupPort = saveMapGroupPort,
             publishMapGroupEventPort = publishPort,
             groupLockPort = lockPort,
@@ -170,13 +165,12 @@ class GroupMemberServiceTest {
             userLocationPort = userLocationPort,
         )
 
-        return Fixture(service, lockPort, saveUserPort, saveMapGroupPort, publishPort, userLocationPort)
+        return Fixture(service, lockPort, saveMapGroupPort, publishPort, userLocationPort)
     }
 
     private data class Fixture(
         val service: GroupMemberService,
         val lockPort: GroupLockPort,
-        val saveUserPort: RecordingSaveUserPort,
         val saveMapGroupPort: RecordingSaveMapGroupPort,
         val publishPort: RecordingPublishMapGroupEventPort,
         val userLocationPort: RecordingUserLocationPort,
@@ -190,12 +184,12 @@ class GroupMemberServiceTest {
         override fun loadById(groupId: GroupId): MapGroup = groups.getValue(groupId)
     }
 
-    private class RecordingSaveUserPort : SaveUserPort {
-        val savedUsers: MutableList<User> = Collections.synchronizedList(mutableListOf())
+    private class FakeLoadMapGroupsPort(private val groups: Map<GroupId, MapGroup>) : LoadMapGroupsPort {
+        override fun loadAllByIds(groupIds: Set<GroupId>): List<MapGroup> =
+            groupIds.mapNotNull { groups[it] }
 
-        override fun save(user: User) {
-            savedUsers += user
-        }
+        override fun loadActiveByParticipantId(userId: UserId): List<MapGroup> =
+            groups.values.filter { !it.isDeleted && userId in it.participants }
     }
 
     private class RecordingSaveMapGroupPort : SaveMapGroupPort {

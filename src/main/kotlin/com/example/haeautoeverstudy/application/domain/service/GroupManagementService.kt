@@ -15,10 +15,8 @@ import com.example.haeautoeverstudy.application.port.out.GroupLockPort
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupsPort
 import com.example.haeautoeverstudy.application.port.out.LoadUserPort
-import com.example.haeautoeverstudy.application.port.out.LoadUsersPort
 import com.example.haeautoeverstudy.application.port.out.PublishMapGroupEventPort
 import com.example.haeautoeverstudy.application.port.out.SaveMapGroupPort
-import com.example.haeautoeverstudy.application.port.out.SaveUserPort
 import com.example.haeautoeverstudy.application.port.out.UserLocationPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -26,11 +24,9 @@ import org.springframework.transaction.support.TransactionTemplate
 @Service
 class GroupManagementService(
     private val loadUserPort: LoadUserPort,
-    private val loadUsersPort: LoadUsersPort,
     private val loadMapGroupPort: LoadMapGroupPort,
     private val loadMapGroupsPort: LoadMapGroupsPort,
     private val existsMapGroupPort: ExistsMapGroupPort,
-    private val saveUserPort: SaveUserPort,
     private val saveMapGroupPort: SaveMapGroupPort,
     private val publishMapGroupEventPort: PublishMapGroupEventPort,
     private val groupLockPort: GroupLockPort,
@@ -45,17 +41,14 @@ class GroupManagementService(
                     throw GroupAlreadyExistsException(command.groupId.value)
                 }
 
-                val owner = loadUserPort.loadById(command.ownerId)
+                loadUserPort.loadById(command.ownerId)
                 val group = MapGroup.of(
                     id = command.groupId,
-                    ownerId = owner.id,
+                    ownerId = command.ownerId,
                     name = command.name,
                     maxParticipantCount = command.maxParticipantCount,
                 )
 
-                owner.joinGroup(group.id)
-
-                saveUserPort.save(owner)
                 saveMapGroupPort.save(group)
 
                 group.toDetail()
@@ -64,12 +57,9 @@ class GroupManagementService(
 
     override fun getGroups(command: GetUserGroupsCommand): List<GroupSummary> =
         transactionTemplate.execute {
-            val user = loadUserPort.loadById(command.userId)
-            loadMapGroupsPort.loadAllByIds(user.groupIds)
-                .asSequence()
-                .filterNot { it.isDeleted }
+            loadUserPort.loadById(command.userId)
+            loadMapGroupsPort.loadActiveByParticipantId(command.userId)
                 .map { it.toSummary() }
-                .toList()
         } ?: emptyList()
 
     override fun delete(command: DeleteGroupCommand) {
@@ -79,17 +69,14 @@ class GroupManagementService(
                 val participantIds = group.participants
                 val event = group.delete(command.requestedBy)
 
-                loadUsersPort.loadAllByIds(participantIds)
-                    .filter { it.isMemberOf(group.id) }
-                    .forEach { user ->
-                        user.leaveGroup(group.id)
-                        saveUserPort.save(user)
-                        if (user.groupIds.isEmpty()) {
-                            userLocationPort.deleteByUserId(user.id)
-                        }
-                    }
-
                 saveMapGroupPort.save(group)
+
+                participantIds.forEach { participantId ->
+                    if (loadMapGroupsPort.loadActiveByParticipantId(participantId).isEmpty()) {
+                        userLocationPort.deleteByUserId(participantId)
+                    }
+                }
+
                 publishMapGroupEventPort.publish(event)
             }
         }

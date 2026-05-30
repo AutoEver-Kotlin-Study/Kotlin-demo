@@ -2,6 +2,7 @@ package com.example.haeautoeverstudy.application.adapter.out.persistence
 
 import com.example.haeautoeverstudy.application.domain.model.GroupId
 import com.example.haeautoeverstudy.application.domain.model.MapGroup
+import com.example.haeautoeverstudy.application.domain.model.UserId
 import com.example.haeautoeverstudy.application.port.out.ExistsMapGroupPort
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupPort
 import com.example.haeautoeverstudy.application.port.out.LoadMapGroupsPort
@@ -26,6 +27,10 @@ class JpaMapGroupPersistenceAdapter(
         return mapGroupJpaRepository.findAllWithParticipantsByIdIn(groupIds.map { it.value })
             .map { it.toDomain() }
     }
+
+    override fun loadActiveByParticipantId(userId: UserId): List<MapGroup> =
+        mapGroupJpaRepository.findAllActiveByParticipantId(userId.value)
+            .map { it.toDomain() }
 
     override fun existsById(groupId: GroupId): Boolean =
         mapGroupJpaRepository.existsById(groupId.value)

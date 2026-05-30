@@ -15,7 +15,7 @@ class JpaUserPersistenceAdapter(
 ) : LoadUserPort, LoadUsersPort, ExistsUserPort, SaveUserPort {
 
     override fun loadById(userId: UserId): User =
-        userJpaRepository.findLockedById(userId.value)
+        userJpaRepository.findById(userId.value)
             .orElseThrow { NoSuchElementException("User[${userId.value}] not found") }
             .toDomain()
 
@@ -24,7 +24,7 @@ class JpaUserPersistenceAdapter(
             return emptyList()
         }
 
-        return userJpaRepository.findAllLockedByIdIn(userIds.map { it.value })
+        return userJpaRepository.findByIdIn(userIds.map { it.value })
             .map { it.toDomain() }
     }
 
